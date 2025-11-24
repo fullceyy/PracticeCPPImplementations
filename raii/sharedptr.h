@@ -9,8 +9,8 @@ public:
     sPtr() : underlying_ptr(nullptr), ref_Count(nullptr) {}
     sPtr(T* newPtrImpl) : underlying_ptr(newPtrImpl), ref_Count(new uint32_t(1)) {}    
     sPtr(const sPtr<T>& other) : 
-    underlying_ptr(other.underlying_ptr), ref_Count(ref_Count) {
-        *(ref_Count)++; 
+    underlying_ptr(other.underlying_ptr), ref_Count(other.ref_Count) {
+        ++(*ref_Count); 
     }
 
     sPtr& operator=(const sPtr<T>& other) {
