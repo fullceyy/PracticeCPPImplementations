@@ -88,7 +88,7 @@ namespace CC {
         operator bool() const noexcept { return underlying_ptr != nullptr; }
 
         template<typename Q, typename ...Args>
-        Q* make_unique(Args&& ... args) {
+        Q make_unique(Args&& ... args) {
             return u_ptr<Q>(new Q(std::forward<Args>(args)...));
         }
 

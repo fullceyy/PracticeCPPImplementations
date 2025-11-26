@@ -1,3 +1,4 @@
+#include <iostream>
 #include "sharedptr.h"
 
 int main(void) {
@@ -8,4 +9,7 @@ int main(void) {
     sPtr<int> five = four;
     sPtr<int> six(five);
     sPtr<int> seven(std::move(two));
+    sPtr<int> eight = make_shared<int>(52);
+
+    std::cout << eight.get() << std::endl;
 }
