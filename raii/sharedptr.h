@@ -10,10 +10,34 @@ private:
     uint32_t *ref_Count;
 public:
     sPtr() : 
-    underlying_ptr(nullptr), ref_Count(nullptr) {}
+    underlying_ptr(nullptr), ref_Count(nullptr) {} 
+    /* sPtr<int> p; will call this constructor; */
+    
+    void sPtrDelete(const sPtr<T>& toDelete) {
+        if(toDelete.underlying_ptr == nullptr) { return; }
+        --(*ref_Count);
+        if(*ref_Count == 0) {
+            delete toDelete.underlying_ptr;
+            delete ref_Count;
+        }
+    }
+
+    void sPtrDelete() {
+        if(underlying_ptr == nullptr) { return; }
+        --(*ref_Count);
+        if(*ref_Count == 0) {
+            delete underlying_ptr;
+            delete ref_Count;
+        }
+    }
+
     // maybe check somehow whether the pointed address already has a sharedPtr looking at it, meaning we can just get the refCount of the memory address and put it here, reduce double deletion?
-    sPtr(T* newPtrImpl) : 
-    underlying_ptr(newPtrImpl), ref_Count(new uint32_t(0)) {}    
+    // Wouldn't it be wrapped otherwise? I don't think new int(42) and sPtr<int>(42) share
+    // same memory address ;)
+    sPtr(T* newPtrImpl) {
+        underlying_ptr = newPtrImpl;
+        ref_Count = new uint32_t(1);
+    }   
     
     sPtr(const sPtr<T>& other) {
         if(other.underlying_ptr != nullptr) {
@@ -22,7 +46,7 @@ public:
             ++(*ref_Count); 
         } else {
             // std::println("copy constructor value has nullptr as u_ptr.");
-            std::cout << "copy constructor value has nullptr as u_ptr." << std::endl;
+            std::cout << "copy constructor value has nullptr as underlying_ptr." << std::endl;
         }
     }
 
@@ -33,32 +57,52 @@ public:
         }
     }
 
+
+    /* This code failed the test_copy_assign test! */
+    // sPtr& operator=(const sPtr<T>& other) {
+    //     if((&other) == this)
+    //         return *this;
+        
+    //     --(*ref_Count);    
+    //     if(other.underlying_ptr != nullptr) {
+    //         std::exchange(underlying_ptr, other.underlying_ptr);
+    //         // just ignore ret val by std::exchange
+    //         ref_Count = other.ref_Count;
+    //         ++(*ref_Count);
+
+    //         // sPtrDelete(other);
+    //     }
+    //     return *this;
+    // }
+
     sPtr& operator=(const sPtr<T>& other) {
-        if((&other) == this)
-            return *this;
+        if((&other) == this) return *this;
+        // 1. Release current object:
+        this->release();    
         
-        --(*ref_Count);
-        underlying_ptr = other.underlying_ptr;
-        ref_Count = other.ref_Count;
-        
-            if(other.underlying_ptr != nullptr) {
-            sPtrDelete(other);
-            // OR
-            // other.sPtrDeleteNoComposition();
+        // 2. Copy raw pointers from `other`
+        if(other.underlying_ptr != nullptr) {
+            std::exchange(underlying_ptr, other.underlying_ptr);
+            ref_Count = other.ref_Count;
             ++(*ref_Count);
         }
+        return *this;
     }
+
 
     sPtr& operator=(const sPtr<T>&& other) {
         if((&other) == this) 
             return *this;
 
         --(*ref_Count);
-        if(*ref_Count == 0) { sPtrDelete(other); }
-        std::exchange(underlying_ptr, other.underlying_ptr);
+        // if(*ref_Count == 0) { sPtrDelete(other); }
+        if(other.underlying_ptr != nullptr) { 
+            std::exchange(underlying_ptr, other.underlying_ptr);
         // underlying_ptr = other.underlying_ptr;
-        ref_Count = other.ref_Count;
-        sPtrDelete(other);
+            ref_Count = other.ref_Count;
+            sPtrDelete(other);   
+        }
+        return *this;
     }
 
     // This is questionable;
@@ -67,6 +111,16 @@ public:
         *underlying_ptr = TVal; // is this even okay syntax wise?
         if(ref_Count == nullptr) 
         { ref_Count = new uint32_t(0); }
+    }
+
+    sPtr& operator=(T* TPtr) {
+        if(TPtr != nullptr) {
+            underlying_ptr = TPtr;
+            ref_Count = new uint32_t(0);
+        } else { 
+            std::cout << "nullptr !" << std::endl; 
+        }
+        return *this;
     }
 
     void sPtrDeleteNoComposition() {
@@ -78,38 +132,51 @@ public:
             return; 
         }
 
-        delete underlying_ptr;
-        if((*ref_Count) >= 0) {
+        --(*ref_Count);
+        if(ref_Count == 0) {
+            delete underlying_ptr;
             delete ref_Count;
         }
     }
 
-    void sPtrDelete(const sPtr<T>& to_Delete) {
-        if(to_Delete.underlying_ptr == nullptr) { 
-            // std::println(
-            //     "Underlying Pointer of this shared_ptr instance is already nullptr."
-            // );
-            std::cout << "Underlying Pointer of this shared_ptr instance is already nullptr." << std::endl;
-            return; 
-        }
+    /* I think this code is complete utter nonsense that I wrote,
+        I think I was drunk if I wrote that; */
+    // void sPtrDelete(const sPtr<T>& to_Delete) {
+    //     if(to_Delete.underlying_ptr == nullptr) { 
+    //         // std::println(
+    //         //     "Underlying Pointer of this shared_ptr instance is already nullptr."
+    //         // );
+    //         std::cout << "Underlying Pointer of this shared_ptr instance is already nullptr." << std::endl;
+    //         return; 
+    //     }
 
-        delete to_Delete.underlying_ptr;
-        if(*to_Delete.ref_Count >= 0) {
-            delete to_Delete.ref_Count;
-        }
-    }
+    //     delete to_Delete.underlying_ptr;
+    //     if(*to_Delete.ref_Count == 0) {
+    //         delete to_Delete.ref_Count;
+    //     }
+    // }
 
     // should they all handle nullptr situations?
     T* get() const { return underlying_ptr; }
+    
+    void release() { 
+        if(ref_Count != nullptr) 
+            --(*ref_Count); 
+            if(*ref_Count == 0) {
+                delete underlying_ptr;
+                delete ref_Count;
+            }    
+        
+        underlying_ptr = nullptr;
+        ref_Count = nullptr;
+    }
+    
     uint32_t useCount() const { return (*ref_Count); }
     T& operator*() const { return *underlying_ptr; }
     T& operator->() const { return underlying_ptr; }
 
-    // make_shared
-
-
     // destructor
-    ~sPtr() { sPtrDelete(*this); }
+    ~sPtr() { /*sPtrDelete(*this);*/  sPtrDelete(); }
     // if the underlying ptr is nullptr then the refCount is not initialized;
 
         /* TODO:
