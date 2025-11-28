@@ -50,12 +50,16 @@ public:
         }
     }
 
-    sPtr(const sPtr<T>&& other) :
-    underlying_ptr(other.underlying_ptr), ref_Count(other.ref_Count) {
+    sPtr(sPtr<T>&& other) {
         if(other.underlying_ptr != nullptr) {
-            ++(*ref_Count);
+            underlying_ptr = other.underlying_ptr;
+            ref_Count = other.ref_Count;
+
+            other.ref_Count = nullptr;
+            other.underlying_ptr = nullptr;
         }
     }
+    
 
 
     /* This code failed the test_copy_assign test! */
@@ -76,13 +80,15 @@ public:
     // }
 
     sPtr& operator=(const sPtr<T>& other) {
-        if((&other) == this) return *this;
+        if((&other) == this) 
+            return *this;
         // 1. Release current object:
         this->release();    
         
         // 2. Copy raw pointers from `other`
         if(other.underlying_ptr != nullptr) {
-            std::exchange(underlying_ptr, other.underlying_ptr);
+            // std::exchange(underlying_ptr, other.underlying_ptr);
+            underlying_ptr = other.underlying_ptr;
             ref_Count = other.ref_Count;
             ++(*ref_Count);
         }
@@ -90,17 +96,21 @@ public:
     }
 
 
-    sPtr& operator=(const sPtr<T>&& other) {
+    sPtr& operator=(sPtr<T>&& other) {
         if((&other) == this) 
             return *this;
 
-        --(*ref_Count);
-        // if(*ref_Count == 0) { sPtrDelete(other); }
+        this->release();
+
         if(other.underlying_ptr != nullptr) { 
-            std::exchange(underlying_ptr, other.underlying_ptr);
-        // underlying_ptr = other.underlying_ptr;
+            // std::exchange(underlying_ptr, other.underlying_ptr);
+            underlying_ptr = other.underlying_ptr;
             ref_Count = other.ref_Count;
-            sPtrDelete(other);   
+            // ++(*ref_Count); why would move increase ref_count, it's transfering not copying
+ 
+            other.release();
+            // other.underlying_ptr = nullptr;
+            // other.ref_Count = nullptr;    
         }
         return *this;
     }
@@ -110,13 +120,13 @@ public:
         if(underlying_ptr == TVal) { return *this; }
         *underlying_ptr = TVal; // is this even okay syntax wise?
         if(ref_Count == nullptr) 
-        { ref_Count = new uint32_t(0); }
+        { ref_Count = new uint32_t(1); }
     }
 
     sPtr& operator=(T* TPtr) {
         if(TPtr != nullptr) {
             underlying_ptr = TPtr;
-            ref_Count = new uint32_t(0);
+            ref_Count = new uint32_t(1);
         } else { 
             std::cout << "nullptr !" << std::endl; 
         }
@@ -159,18 +169,29 @@ public:
     // should they all handle nullptr situations?
     T* get() const { return underlying_ptr; }
     
-    void release() { 
-        if(ref_Count != nullptr) 
-            --(*ref_Count); 
-            if(*ref_Count == 0) {
-                delete underlying_ptr;
-                delete ref_Count;
-            }    
-        
-        underlying_ptr = nullptr;
-        ref_Count = nullptr;
-    }
+    // release should release, not delete! Am I really this dumb
+    // void release() { 
+    //     if(ref_Count != nullptr) { 
+    //         --(*ref_Count); 
+    //             if(*ref_Count == 0) {
+    //                 if(underlying_ptr != nullptr) {
+    //                     delete underlying_ptr;
+    //                 }
+    //                 delete ref_Count;
+    //             }    
+    //     }
+    // } 
     
+    void release() {
+        if(ref_Count != nullptr) {
+            --(*ref_Count);
+            if(underlying_ptr != nullptr) {
+                underlying_ptr = nullptr;
+            }
+            ref_Count = nullptr;
+        }
+    }
+
     uint32_t useCount() const { return (*ref_Count); }
     T& operator*() const { return *underlying_ptr; }
     T& operator->() const { return underlying_ptr; }
