@@ -14,7 +14,7 @@ namespace CC {
         u_ptr& operator=(const u_ptr<T>&) = delete; // copy assignment
 
         u_ptr& operator=(const u_ptr<T>&& other) {
-            if(*this == other) {
+            if(this == &other) {
                 return (*this);
             }
 
